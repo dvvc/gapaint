@@ -1,0 +1,12 @@
+-*- mode: org -*-
+
+* A Genetic Algorithm painting program
+
+This program reads a PNM image and tries to approximate it with colored,
+semi-transparent triangles using a Genetic Algorithm.
+
+The idea is based on
+[[http://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/]]
+
+
+
