@@ -15,4 +15,5 @@ cabal-version:       >=1.8
 executable gapaint
   main-is:             Main.hs       
   -- other-modules:       
-  build-depends:       base ==4.6.*, array ==0.4.*
+  build-depends:       base ==4.6.*, array ==0.4.*, random ==1.0.*, OpenGL ==2.8.*,
+                       GLUT ==2.4.*
