@@ -2,13 +2,15 @@
 
 module GAPaint where
 
-import Bitmap (Triangle(..), Vertex(..), Color(..))
+import Bitmap (Triangle(..), Vertex(..), Color(..),Bitmap2(..),writePNM2)
 import Render (trianglesToBitmap)
 
 import System.Random
 import Control.Monad (replicateM)
 import Data.Word (Word8)
 import Data.List (maximumBy)
+import qualified Data.ByteString as BS
+
 ---------------------------------------------------
 -- GA Parameters
 
@@ -17,6 +19,8 @@ initialPop = 100 -- Size of the initial candidate pool
 minTriangles = 1  -- Minimum number of triangles for initial candidate
 maxTriangles = 10 -- Maximum number of triangles for initial candidate
 
+genSize = 10 -- Size of the population to generate each iteration
+tourSize = 1 -- Size of each tournament instance
 ---------------------------------------------------
 
 -- |A candidate has a list of triangles
@@ -78,16 +82,16 @@ generatePool :: (Int,Int) -> IO [Candidate]
 generatePool (w,h) = replicateM initialPop (generateCandidate (w,h))
 
 -- |Given a target picture and a candidate, return the score
-score :: [Word8] -> Candidate -> (Int,Int) -> IO Score
-score target candidate (w,h) = do
+score :: BS.ByteString -> (Int,Int)  -> Candidate -> IO Score
+score target (w,h) candidate = do
   pixels <- trianglesToBitmap candidate (w,h)
   return $ Score candidate (fitnessF target pixels)
 
 -- |The fitness function
-fitnessF :: [Word8] -> [Word8] -> Double
-fitnessF t c = total / (fromIntegral (length t))
+fitnessF :: BS.ByteString -> BS.ByteString -> Double
+fitnessF t c = total / (fromIntegral (BS.length t))
   where absum x y = if x > y then x - y else y - x
-        total = sum $ map fromIntegral $ zipWith absum t c
+        total = sum $ map fromIntegral $ BS.zipWith absum t c
 
 -- |Generate a list of n unique indices between 0 and max (inclusive), making
 -- sure that they are not repeated
@@ -111,7 +115,38 @@ tournament scores genSize tourSize = tournament' scores genSize tourSize []
             tournament' sc (gs-1) ts (winner:res)
 
 
+-- |Return the average fitness of a list of scores
+avgFitness :: [Score] -> Double
+avgFitness scores = (sum $ map fitness scores) / (fromIntegral (length scores))
 
+--------------------------------
+-- |Main function
+--------------------------------
+evolve :: Bitmap2 -> IO ()
+evolve (Bitmap2 target dims) = do
+
+  -- generate initial candidate pool
+  pool <- generatePool dims
+
+  putStrLn $ "Target dimensions: " ++ (show dims)
+  putStrLn $ "Target lenght: " ++ (show (BS.length target))
+
+  -- calculate the candidates' scores
+  -- FIXME: This can be done only when needed (i.e., when a candidate is picked
+  -- in the tournament
+  scores <- mapM (score target dims) pool
+
+
+  putStrLn $ show (head pool)
+  bmp <- (trianglesToBitmap (head pool) dims)
+  writePNM2 "triangels.pnm" bmp dims
+
+  -- pick a set of candidates for the next iteration
+  winners <- tournament scores genSize tourSize
+
+  -- output the average fitness
+  --putStrLn $ "Avg fitness: " ++ (show $ avgFitness winners)
+  putStrLn "Bye"
 -- crossover phase (s times):
 -- -- select 2 parents based on highest fitness
 -- -- if random(pcross)
