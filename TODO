@@ -1,0 +1,14 @@
+-*- mode: org -*-
+
+* TODO Save state when finished
+  Serialize the current population in a text file, then add a flag to start
+  from there
+
+* TODO Add new candidates each iteration
+  Currently the pool size stays the same at each iteration. An alternative
+  would be to inject some new candidates at each step, so we have genSize +
+  newCandidates. The less fit ones will go away in the tournament phase,
+  anyway, but they should add diversity.
+
+* TODO Optimize code
+  There are some functions that can be optimized, such as dropAlpha and fitness

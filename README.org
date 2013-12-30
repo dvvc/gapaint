@@ -1,0 +1,34 @@
+
+* A Genetic Algorithm painting program
+
+This program reads a PNM image and tries to approximate it with colored,
+semi-transparent triangles using a Genetic Algorithm.
+
+The idea is based on [[http://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/][Roger Alsing's post]], although the technique is different:
+this one uses more candidates per generation and runs a tournament algorithm to
+select the best ones.
+
+** Status
+
+So far I've only run the program for around 20 minutes, and even though the
+fitness function improves at each iteration, I haven't yet seen any picture that
+is close to the original one :). Next step is to run for some hours and think
+how to speed up the process. Also, some functions are not optimized and run
+rather slowly.
+
+** Usage
+
+Build using:
+
+#+BEGIN_SRC sh
+cabal configure
+cabal build
+#+END_SRC
+
+Then execute the program and pass the target picture, in PNM format,
+e.g. =gapaint monalisa.pnm=. More advanced control is not yet supported through
+command line, so number of iterations, probabilities, pool size, etc, have to
+be modified in the code.
+
+The program will save the best image for each iteration as
+=candidate_n.pnm=.
