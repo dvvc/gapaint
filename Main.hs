@@ -24,4 +24,5 @@ main = do
   wId <- Render.init (400,400)
   bmp <- readPNM2 "mona400.pnm"
   evolve bmp
+  putStrLn "Done"
   Render.close wId

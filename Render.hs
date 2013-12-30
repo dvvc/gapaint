@@ -14,6 +14,8 @@ import Data.Array.Storable
 import Data.Word (Word8)
 import Data.List.Split (chunksOf)
 import qualified Data.ByteString as BS
+import Data.ByteString.Internal (fromForeignPtr)
+import Foreign.ForeignPtr (newForeignPtr_)
 
 import Foreign.Marshal.Array (peekArray)
 import Foreign.Marshal.Alloc (allocaBytes)
@@ -128,5 +130,6 @@ getpixels (w,h) = do
   allocaBytes arraySize $ \ptr -> do
     readPixels (Position 0 0) (Size (fromIntegral w) (fromIntegral h))
       $ PixelData RGBA UnsignedByte ptr
-    pixels <- peekArray arraySize ptr
-    return $ BS.pack pixels
+    fptr <- newForeignPtr_ ptr
+    return $ fromForeignPtr fptr 0 arraySize
+--    (peekArray arraySize ptr) >>= return . BS.pack

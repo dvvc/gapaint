@@ -24,4 +24,4 @@ executable gapaint
                        bytestring ==0.10.*
 
   if flag(debug)
-     GHC-Options: -rtsopts -prof -auto
+     GHC-Options: -rtsopts -prof -auto-all -caf-all

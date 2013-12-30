@@ -29,7 +29,7 @@ type Candidate = [Triangle]
 -- |A candidate's Score is its fitness (the lower the better)
 data Score = Score {
   candidate :: Candidate,
-  fitness :: Double
+  fitness :: !Double
   }
 
 -- |Generate a random Integer between lo and hi, both included
@@ -136,13 +136,22 @@ evolve (Bitmap2 target dims) = do
   -- in the tournament
   scores <- mapM (score target dims) pool
 
+  putStrLn "End iteration 1"
+  scores <- mapM (score target dims) pool
+  putStrLn "End iteration 1"
+  scores <- mapM (score target dims) pool
+  putStrLn "End iteration 1"
+  scores <- mapM (score target dims) pool
+  putStrLn "End iteration 1"
+  scores <- mapM (score target dims) pool
 
   putStrLn $ show (head pool)
   bmp <- (trianglesToBitmap (head pool) dims)
+  putStrLn "About to write file"
   writePNM2 "triangels.pnm" bmp dims
 
   -- pick a set of candidates for the next iteration
-  winners <- tournament scores genSize tourSize
+  --winners <- tournament scores genSize tourSize
 
   -- output the average fitness
   --putStrLn $ "Avg fitness: " ++ (show $ avgFitness winners)
