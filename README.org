@@ -25,10 +25,11 @@ cabal configure
 cabal build
 #+END_SRC
 
-Then execute the program and pass the target picture, in PNM format,
-e.g. =gapaint monalisa.pnm=. More advanced control is not yet supported through
-command line, so number of iterations, probabilities, pool size, etc, have to
-be modified in the code.
+Then execute the program and pass the target picture, in PNM format. The default
+stack size will probably be insufficient, so I also set it to 100M e.g. =gapaint
+monalisa.pnm +RTS -K100M=. More advanced control is not yet supported through
+command line, so number of iterations, probabilities, pool size, etc, have to be
+modified in the code.
 
 The program will save the best image for each iteration as
 =candidate_n.pnm=.
