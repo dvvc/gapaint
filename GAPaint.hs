@@ -14,13 +14,16 @@ import qualified Data.ByteString as BS
 ---------------------------------------------------
 -- GA Parameters
 
-initialPop = 100 -- Size of the initial candidate pool
+initialPop = 20 -- Size of the initial candidate pool
 
 minTriangles = 1  -- Minimum number of triangles for initial candidate
 maxTriangles = 10 -- Maximum number of triangles for initial candidate
 
 genSize = 10 -- Size of the population to generate each iteration
-tourSize = 1 -- Size of each tournament instance
+tourSize = 3 -- Size of each tournament instance
+
+pCrossover = 0.7 -- Probability of performing crossover between two candidates
+pMutation = 0.1 -- Probability of mutating one candidate
 ---------------------------------------------------
 
 -- |A candidate has a list of triangles
@@ -29,7 +32,7 @@ type Candidate = [Triangle]
 -- |A candidate's Score is its fitness (the lower the better)
 data Score = Score {
   candidate :: Candidate,
-  fitness :: !Double
+  fitness :: Double
   }
 
 -- |Generate a random Integer between lo and hi, both included
@@ -85,6 +88,9 @@ generatePool (w,h) = replicateM initialPop (generateCandidate (w,h))
 score :: BS.ByteString -> (Int,Int)  -> Candidate -> IO Score
 score target (w,h) candidate = do
   pixels <- trianglesToBitmap candidate (w,h)
+  putStrLn "In score"
+  putStrLn $ (show (BS.take 100 pixels))
+  putStrLn $ "Fitness: " ++ (show (fitnessF target pixels))
   return $ Score candidate (fitnessF target pixels)
 
 -- |The fitness function
@@ -136,17 +142,14 @@ evolve (Bitmap2 target dims) = do
   -- in the tournament
   scores <- mapM (score target dims) pool
 
-  putStrLn "End iteration 1"
-  scores <- mapM (score target dims) pool
-  putStrLn "End iteration 1"
-  scores <- mapM (score target dims) pool
-  putStrLn "End iteration 1"
-  scores <- mapM (score target dims) pool
-  putStrLn "End iteration 1"
-  scores <- mapM (score target dims) pool
+  putStrLn "---"
+  putStrLn $ "Avg fitness: " ++ (show (avgFitness scores))
 
-  putStrLn $ show (head pool)
+  putStrLn "Before trianglesToBitmap"
   bmp <- (trianglesToBitmap (head pool) dims)
+  putStrLn "After triangles to bitmap"
+  putStrLn $ "Score " ++ (show $ fitness (head scores))
+  putStrLn $ "Length of ttbmp: " ++ (show (BS.length bmp))
   putStrLn "About to write file"
   writePNM2 "triangels.pnm" bmp dims
 

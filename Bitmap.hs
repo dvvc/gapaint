@@ -73,7 +73,7 @@ writePNM2 fname pixels (w,h) = writeFile fname ("P3\n# \n" ++
                                                 show h ++ "\n" ++
                                                 "255\n" ++
                                                 serializePixels pixels)
-  where serializePixels pixels = intersperse '\n' $ BSC.unpack pixels
+  where serializePixels pixels = concat $ intersperse "\n" $ map show $ BS.unpack pixels
 
 
 

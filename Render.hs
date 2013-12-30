@@ -4,7 +4,7 @@
 -- is the best way to convert from shapes to pixel maps and 2) even if it is,
 -- the logic of HOpenGL -> readPixels -> list of pixel values seems not very
 -- efficient
-
+{-# LANGUAGE BangPatterns #-}
 module Render where
 
 import Graphics.UI.GLUT hiding (Triangle)
@@ -14,13 +14,14 @@ import Data.Array.Storable
 import Data.Word (Word8)
 import Data.List.Split (chunksOf)
 import qualified Data.ByteString as BS
-import Data.ByteString.Internal (fromForeignPtr)
-import Foreign.ForeignPtr (newForeignPtr_)
+import qualified Data.ByteString.Internal as BSI
+--import Data.ByteString.Internal (fromForeignPtr)
+import Foreign.ForeignPtr (newForeignPtr_, touchForeignPtr)
 
 import Foreign.Marshal.Array (peekArray)
 import Foreign.Marshal.Alloc (allocaBytes)
 
-import qualified Bitmap as B (Triangle(..), Color(..), red, green, blue, x, y)
+import qualified Bitmap as B -- (Triangle(..), Color(..), red, green, blue, x, y)
 
 -- |Performs two operations on a list of color components in the form
 -- r,g,b,a,r,g,b,a as returned by readPixels: 1) removes the alpha from each
@@ -38,15 +39,26 @@ import qualified Bitmap as B (Triangle(..), Color(..), red, green, blue, x, y)
 
 
 -- Based on http://stackoverflow.com/a/5289424
--- groups :: Int -> ByteString -> [ByteString]
--- groups n = map (take n) . takeWhile ((/=) "") . iterate (drop n)
+groups :: Int -> BS.ByteString -> [BS.ByteString]
+groups n = map (BS.take n) . takeWhile ((/=) BS.empty) . iterate (BS.drop n)
 
--- removeEveryNth :: Int -> ByteString -> ByteString
--- removeEveryNth n = concatMap (take (n-1)) . groups n
+removeEveryNth :: Int -> BS.ByteString -> BS.ByteString
+removeEveryNth n bs = BS.concat $ map (BS.take (n-1)) $ groups n bs
 
 dropAlpha :: BS.ByteString -> BS.ByteString
- --removeEveryNth 4
-dropAlpha bs = BS.append (BS.take 3 bs) (dropAlpha (BS.drop 4 bs))
+dropAlpha = removeEveryNth 4
+
+
+--removeEveryNth 4
+--dropAlpha bs = if bs == BS.empty
+--               then BS.empty
+--               else BS.append (BS.take 3 bs) (dropAlpha (BS.drop 4 bs))
+-- dropAlpha bs = dropAlpha' bs BS.empty
+--   where dropAlpha' bs !acc = if bs == BS.empty
+--                             then acc
+--                             else dropAlpha' (BS.drop 4 bs) (BS.append (BS.take 3 bs) acc)
+
+
 
 -- reverseRows :: Int -> ByteString -> ByteString
 -- reverseRows w pv = concat $ reverse $ chunksOf w pv
@@ -72,7 +84,7 @@ init (w,h) = do
   windowSize $= Size (fromIntegral w) (fromIntegral h)
   blend $= Enabled
   blendFunc $= (SrcAlpha, OneMinusSrcAlpha)
-  ortho2D (-1) (fromIntegral (w-1)) (-1) (fromIntegral (w-1))
+  ortho2D (-1) (fromIntegral (w-1)) (fromIntegral (w-1)) (-1)
   reshapeCallback $= Just reshape
   return wId
 
@@ -86,6 +98,13 @@ trianglesToBitmap ts (w,h) = do
   mainLoopEvent -- force redraw
   pixels <- getpixels (w,h)
   return $ dropAlpha pixels
+  --pixels <- getpixels (w,h)
+  --putStrLn "after getpixels"
+  --putStrLn $ "len: " ++ (show (BS.length pixels))
+  --putStrLn $ (show (BS.take 100 pixels))
+  --let noAlpha = dropAlpha pixels
+  --putStrLn $ "noalpha: " ++ (show (BS.length noAlpha))
+  --return noAlpha
 
 
 reshape :: ReshapeCallback
@@ -116,20 +135,50 @@ buildTriangles ((B.Triangle (v1,v2,v3) c a):ts) =
 displayTriangles :: [B.Triangle] -> IO ()
 displayTriangles ts = do
   clear [ColorBuffer]
-  renderPrimitive Triangles $ sequence_ $ buildTriangles ts
+  renderPrimitive Triangles $ sequence_ $
+    buildTriangles [B.Triangle (B.Vertex 0 399,B.Vertex 10 399, B.Vertex 5 396) (B.Color 100 100 100) 200]
   flush
   postRedisplay Nothing
 
 
 type PixelArray = StorableArray Int Int
 
+
+preservingBufferBinding :: BufferTarget -> IO a -> IO a
+preservingBufferBinding target action = do
+  buffer <- get $ bindBuffer target
+  result <- action
+  bindBuffer target $= buffer
+  return result
+
+
 getpixels :: (Int,Int) -> IO BS.ByteString
 getpixels (w,h) = do
   --pixelArray <- newArray (0, 9) 0 :: IO PixelArray
   let arraySize = (fromIntegral (w * h * 4))
-  allocaBytes arraySize $ \ptr -> do
-    readPixels (Position 0 0) (Size (fromIntegral w) (fromIntegral h))
-      $ PixelData RGBA UnsignedByte ptr
-    fptr <- newForeignPtr_ ptr
-    return $ fromForeignPtr fptr 0 arraySize
---    (peekArray arraySize ptr) >>= return . BS.pack
+  bs2 <- allocaBytes arraySize $ \ptr -> do
+    --preservingBufferBinding PixelPackBuffer $ do
+      --bindBuffer PixelPackBuffer $= Nothing
+      --preservingClientAttrib [PixelStoreAttributes] $ do
+      --  rowAlignment Pack $= 1
+    readPixels (Position 0 0) (Size (fromIntegral w) (fromIntegral h)) $ PixelData RGBA UnsignedByte ptr
+
+
+    bs <- BSI.create arraySize $ \d -> BSI.memcpy d ptr arraySize
+
+
+    a <- peekArray arraySize ptr
+    putStrLn $ "List: " ++ (show (take 800 a))
+
+--    fptr <- newForeignPtr_ ptr
+--    touchForeignPtr fptr
+    putStrLn "return"
+--    let bs = fromForeignPtr fptr 0 arraySize
+    putStrLn $ "len fptr: " ++ (show (BS.length bs))
+    putStrLn $ (show (BS.take 100 bs))
+    return bs
+
+  putStrLn "Returned"
+  putStrLn $ (show (BS.length bs2))
+  putStrLn $ (show (BS.take 100 bs2))
+  return bs2
