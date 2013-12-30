@@ -42,7 +42,7 @@ init (w,h) = do
   windowSize $= Size (fromIntegral w) (fromIntegral h)
   blend $= Enabled
   blendFunc $= (SrcAlpha, OneMinusSrcAlpha)
-  ortho2D 0 (fromIntegral (w-1)) (fromIntegral (w-1)) 0
+  ortho2D 0 (fromIntegral (w-1)) 0 (fromIntegral (w-1))
   reshapeCallback $= Just reshape
   return wId
 
@@ -80,7 +80,7 @@ displayTriangles :: [B.Triangle] -> IO ()
 displayTriangles ts = do
   clear [ColorBuffer]
   renderPrimitive Triangles $ sequence_ $
-    buildTriangles [B.Triangle (B.Vertex 1 0, B.Vertex 100 0, B.Vertex 100 100) (B.Color 255 255 255) 255]--ts
+    buildTriangles ts --[B.Triangle (B.Vertex 0 0, B.Vertex 100 0, B.Vertex 100 100) (B.Color 255 255 255) 255]
   flush
   postRedisplay Nothing
 
@@ -93,6 +93,7 @@ preservingBufferBinding target action = do
   return result
 
 
+-- |Warning! This function returns the rows of the image flipped
 getpixels :: (Int,Int) -> IO BS.ByteString
 getpixels (w,h) = do
 

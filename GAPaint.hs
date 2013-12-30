@@ -14,16 +14,17 @@ import qualified Data.ByteString as BS
 ---------------------------------------------------
 -- GA Parameters
 
-initialPop = 20 -- Size of the initial candidate pool
+initialPop = 100 -- Size of the initial candidate pool
 
 minTriangles = 1  -- Minimum number of triangles for initial candidate
 maxTriangles = 10 -- Maximum number of triangles for initial candidate
 
-genSize = 10 -- Size of the population to generate each iteration
+genSize = 40 -- Size of the population to generate each iteration
 tourSize = 3 -- Size of each tournament instance
 
 pCrossover = 0.7 -- Probability of performing crossover between two candidates
 pMutation = 0.1 -- Probability of mutating one candidate
+pMutateAdd = 0.5 -- Prob of adding a triangle during mutation, (1-p) of removing
 ---------------------------------------------------
 
 -- |A candidate has a list of triangles
@@ -88,14 +89,19 @@ generatePool (w,h) = replicateM initialPop (generateCandidate (w,h))
 score :: BS.ByteString -> (Int,Int)  -> Candidate -> IO Score
 score target (w,h) candidate = do
   pixels <- trianglesToBitmap candidate (w,h)
-  putStrLn $ "Fitness: " ++ (show (fitnessF target pixels))
+--  putStrLn $ "Fitness: " ++ (show (fitnessF target pixels))
+--  putStrLn $ "Target: " ++ (show (take 100 (BS.unpack target)))
+--  putStrLn $ "Candidate: " ++ (show (take 100 (BS.unpack pixels)))
+--  putStrLn $ "Values: " ++ (show (take 100 (BS.zipWith absub target pixels)))
   return $ Score candidate (fitnessF target pixels)
+
+absub x y = if x > y then x - y else y - x
 
 -- |The fitness function
 fitnessF :: BS.ByteString -> BS.ByteString -> Double
 fitnessF t c = total / (fromIntegral (BS.length t))
-  where absum x y = if x > y then x - y else y - x
-        total = sum $ map fromIntegral $ BS.zipWith absum t c
+  where absub x y = if x > y then x - y else y - x
+        total = sum $ map fromIntegral $ BS.zipWith absub t c
 
 -- |Generate a list of n unique indices between 0 and max (inclusive), making
 -- sure that they are not repeated
@@ -123,30 +129,120 @@ tournament scores genSize tourSize = tournament' scores genSize tourSize []
 avgFitness :: [Score] -> Double
 avgFitness scores = (sum $ map fitness scores) / (fromIntegral (length scores))
 
+-- |Cross two candidates at two points
+-- TODO: Can be generalized
+cross :: Int -> Int -> [a] -> [a] -> [[a]]
+cross cp1 cp2 c1 c2 = let c1h1 = take cp1 c1
+                          c2h1 = take cp2 c2
+                          c1h2 = drop cp1 c1
+                          c2h2 = drop cp2 c2
+                      in [c1h1 ++ c2h2, c2h1 ++ c1h2]
+
+randomCross :: [a] -> [a] -> IO [[a]]
+randomCross c1 c2 = do
+  cp1 <- randInt 1 ((length c1) - 1)
+  cp2 <- randInt 1 ((length c2) - 1)
+  return $ cross cp1 cp2 c1 c2
+
+-- |For every pair of candidates, either cross with a probability of 'pc', or
+-- return unmodified
+crossover :: Double -> [[a]] -> IO [[a]]
+crossover pc cs = crossover' cs []
+  where crossover' [] acc = return acc
+        crossover' (c1:c2:cs) acc = do
+          choice <- randD 0 1
+          if choice < pc
+            then do
+                 [c1',c2'] <- randomCross c1 c2
+                 crossover' cs (c1':c2':acc)
+            else crossover' cs (c1:c2:acc)
+
+
+randomAdd :: (Int,Int) -> Candidate -> IO Candidate
+randomAdd dims c = do
+  i <- randInt 0 (length c)
+  t <- randomTriangle dims
+  return $ (take i c) ++ [t] ++ (drop i c)
+
+randomDel :: Candidate -> IO Candidate
+randomDel c = do
+  i <- randInt 0 ((length c) - 1)
+  return $ (take i c) ++ (drop (i+1) c)
+
+randomMutation :: (Int,Int) -> Double -> Candidate -> IO Candidate
+randomMutation dims pa c = do
+  padd <- randD 0 1
+  -- Always add when length is 1
+  if (length c) == 1 || padd < pa
+    then randomAdd dims c
+    else randomDel c
+
+-- |For each candidate, mutate with a probability of 'pm', or return
+-- unmodified. Mutation either adds or removes a random triangle
+mutate :: (Int,Int) -> Double -> [Candidate] -> IO [Candidate]
+mutate dims pm cs = mutate' cs []
+  where mutate' [] acc = return acc
+        mutate' (c:cs) acc = do
+          choice <- randD 0 1
+          if choice < pm
+             then do
+                  c' <- randomMutation dims pMutateAdd c
+                  mutate' cs (c':acc)
+            else mutate' cs (c:acc)
+
+
 --------------------------------
 -- |Main function
 --------------------------------
-evolve :: Bitmap2 -> IO ()
-evolve (Bitmap2 target dims) = do
+evolve :: Int -> Bitmap2 -> IO [Candidate]
+evolve n target@(Bitmap2 tpixels dims) = do
 
   -- generate initial candidate pool
   pool <- generatePool dims
 
   putStrLn $ "Target dimensions: " ++ (show dims)
-  putStrLn $ "Target lenght: " ++ (show (BS.length target))
+  putStrLn $ "Target lenght: " ++ (show (BS.length tpixels))
+
+  evolveTimes n pool target
+
+
+evolveTimes :: Int -> [Candidate] -> Bitmap2 -> IO [Candidate]
+evolveTimes 0 pool target = return pool
+evolveTimes x pool target@(Bitmap2 tpixels dims) = do
 
   -- calculate the candidates' scores
-  scores <- mapM (score target dims) pool
+  scores <- mapM (score tpixels dims) pool
 
-  bmp <- (trianglesToBitmap (head pool) dims)
-  writePNM2 "triangels.pnm" bmp dims
+  putStrLn $ "Iteration " ++ (show x) ++ ": " ++ (show (avgFitness scores))
+    ++ "(" ++ (show $ length scores) ++ ")"
+
+
+  -- TODO: get the best
+  bmp <- (trianglesToBitmap (candidate (scores !! 2)) dims)
+  writePNM2 ("candidate_" ++ (show x) ++ ".pnm") bmp dims
+
+  newPool <- evolveIteration scores target
+  -- output the average fitness
+  -- write the top candidate
+
+  evolveTimes (x-1) newPool target
+
+
+
+-- |Run one evolution iteration. Given a pool of candidates and a target bitmap,
+-- generate a new set of candidates
+evolveIteration :: [Score] -> Bitmap2 -> IO [Candidate]
+evolveIteration pool (Bitmap2 tpixels dims) = do
 
   -- pick a set of candidates for the next iteration
-  winners <- tournament scores genSize tourSize
+  winners <- tournament pool genSize tourSize
 
-  -- output the average fitness
-  putStrLn $ "Avg fitness: " ++ (show $ avgFitness winners)
-  putStrLn "Bye"
+  crossed <- crossover pCrossover $ map candidate winners
+
+  mutated <- mutate dims pMutation crossed
+
+  return mutated
+
 -- crossover phase (s times):
 -- -- select 2 parents based on highest fitness
 -- -- if random(pcross)

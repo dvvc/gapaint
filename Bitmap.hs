@@ -111,10 +111,8 @@ dropLines n xs = (iterate (BS.tail . BSC.dropWhile (/= '\n')) xs) !! n
 -- |Reads a PNM image into a Bitmap2
 readPNM2 :: String -> IO Bitmap2
 readPNM2 filename = do
-  putStrLn "Enter readPNM2"
-  contents <- BS.readFile filename
-  putStrLn $ "read " ++ (show (length $ BSC.lines contents))
-  let noHeaders = dropLines 2 contents --BS.concat $ drop 2 $ BSC.lines contents
-  let (w,h) = readPNMDim2 $ BSC.unpack $ head $ BSC.lines noHeaders
-  putStrLn $ "dimensions: " ++ (show w) ++ " " ++ (show h)
-  return (Bitmap2 (BS.drop 2 noHeaders) (w,h))
+  contents <- readFile filename
+  let noHeaders = drop 2 $ lines contents
+      [w,h] = map read $ words $ head noHeaders
+      pixels = map read $ drop 2 noHeaders
+  return (Bitmap2 (BS.pack pixels) (w,h))
