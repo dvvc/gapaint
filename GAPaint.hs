@@ -88,8 +88,6 @@ generatePool (w,h) = replicateM initialPop (generateCandidate (w,h))
 score :: BS.ByteString -> (Int,Int)  -> Candidate -> IO Score
 score target (w,h) candidate = do
   pixels <- trianglesToBitmap candidate (w,h)
-  putStrLn "In score"
-  putStrLn $ (show (BS.take 100 pixels))
   putStrLn $ "Fitness: " ++ (show (fitnessF target pixels))
   return $ Score candidate (fitnessF target pixels)
 
@@ -138,26 +136,16 @@ evolve (Bitmap2 target dims) = do
   putStrLn $ "Target lenght: " ++ (show (BS.length target))
 
   -- calculate the candidates' scores
-  -- FIXME: This can be done only when needed (i.e., when a candidate is picked
-  -- in the tournament
   scores <- mapM (score target dims) pool
 
-  putStrLn "---"
-  putStrLn $ "Avg fitness: " ++ (show (avgFitness scores))
-
-  putStrLn "Before trianglesToBitmap"
   bmp <- (trianglesToBitmap (head pool) dims)
-  putStrLn "After triangles to bitmap"
-  putStrLn $ "Score " ++ (show $ fitness (head scores))
-  putStrLn $ "Length of ttbmp: " ++ (show (BS.length bmp))
-  putStrLn "About to write file"
   writePNM2 "triangels.pnm" bmp dims
 
   -- pick a set of candidates for the next iteration
-  --winners <- tournament scores genSize tourSize
+  winners <- tournament scores genSize tourSize
 
   -- output the average fitness
-  --putStrLn $ "Avg fitness: " ++ (show $ avgFitness winners)
+  putStrLn $ "Avg fitness: " ++ (show $ avgFitness winners)
   putStrLn "Bye"
 -- crossover phase (s times):
 -- -- select 2 parents based on highest fitness

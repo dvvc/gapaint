@@ -23,21 +23,6 @@ import Foreign.Marshal.Alloc (allocaBytes)
 
 import qualified Bitmap as B -- (Triangle(..), Color(..), red, green, blue, x, y)
 
--- |Performs two operations on a list of color components in the form
--- r,g,b,a,r,g,b,a as returned by readPixels: 1) removes the alpha from each
--- group of four and 2) rearranges the rows (originally [rn...r0] -> [r0...rn]
--- TODO: Inefficient
--- arrangePixels :: [a] -> (Int, Int) -> [a]
--- arrangePixels [] _ = []
--- arrangePixels pv (w,h) = (arrangePixels rest (w,h)) ++ (dropAlpha row)
---   where rlen = w * 4
---         row = (take rlen pv)
---         rest = (drop rlen pv)
---         dropAlpha [] = []
---         dropAlpha v = (take 3 v) ++ (dropAlpha (drop 4 v))
-
-
-
 -- Based on http://stackoverflow.com/a/5289424
 groups :: Int -> BS.ByteString -> [BS.ByteString]
 groups n = map (BS.take n) . takeWhile ((/=) BS.empty) . iterate (BS.drop n)
@@ -48,33 +33,6 @@ removeEveryNth n bs = BS.concat $ map (BS.take (n-1)) $ groups n bs
 dropAlpha :: BS.ByteString -> BS.ByteString
 dropAlpha = removeEveryNth 4
 
-
---removeEveryNth 4
---dropAlpha bs = if bs == BS.empty
---               then BS.empty
---               else BS.append (BS.take 3 bs) (dropAlpha (BS.drop 4 bs))
--- dropAlpha bs = dropAlpha' bs BS.empty
---   where dropAlpha' bs !acc = if bs == BS.empty
---                             then acc
---                             else dropAlpha' (BS.drop 4 bs) (BS.append (BS.take 3 bs) acc)
-
-
-
--- reverseRows :: Int -> ByteString -> ByteString
--- reverseRows w pv = concat $ reverse $ chunksOf w pv
-
--- arrangePixels :: ByteString -> (Int, Int) -> ByteString
--- arrangePixels pv (w,h) = reverseRows (w*3) $ dropAlpha pv
-
-
---transposePixels :: [Word8] -> (Int,Int) -> [Word8]
--- transposePixels [] _ = []
--- transposePixels ps (w,h) = (transposePixels (drop (w*4) ps) (w,h)) ++
---                            (dropFourth (take (w*4) ps))
-
--- dropFourth [] = []
--- dropFourth s = (take 3 s) ++ (dropFourth (drop 4 s))
-
 -- |One time initialization
 init :: (Int,Int) -> IO Window
 init (w,h) = do
@@ -84,7 +42,7 @@ init (w,h) = do
   windowSize $= Size (fromIntegral w) (fromIntegral h)
   blend $= Enabled
   blendFunc $= (SrcAlpha, OneMinusSrcAlpha)
-  ortho2D (-1) (fromIntegral (w-1)) (fromIntegral (w-1)) (-1)
+  ortho2D 0 (fromIntegral (w-1)) (fromIntegral (w-1)) 0
   reshapeCallback $= Just reshape
   return wId
 
@@ -98,14 +56,6 @@ trianglesToBitmap ts (w,h) = do
   mainLoopEvent -- force redraw
   pixels <- getpixels (w,h)
   return $ dropAlpha pixels
-  --pixels <- getpixels (w,h)
-  --putStrLn "after getpixels"
-  --putStrLn $ "len: " ++ (show (BS.length pixels))
-  --putStrLn $ (show (BS.take 100 pixels))
-  --let noAlpha = dropAlpha pixels
-  --putStrLn $ "noalpha: " ++ (show (BS.length noAlpha))
-  --return noAlpha
-
 
 reshape :: ReshapeCallback
 reshape size = do
@@ -126,22 +76,13 @@ buildTriangles ((B.Triangle (v1,v2,v3) c a):ts) =
      ,vertex2f (fi (B.x v3)) (fi (B.y v3))] ++ buildTriangles ts
 
 
--- drawTriangles
---   renderPrimitive Points $ do
---     color4f 1 0.5 0 1
---     mapM (\(x,y) -> vertex2f (fromIntegral x) (fromIntegral y)) pixels
-
-
 displayTriangles :: [B.Triangle] -> IO ()
 displayTriangles ts = do
   clear [ColorBuffer]
   renderPrimitive Triangles $ sequence_ $
-    buildTriangles [B.Triangle (B.Vertex 0 399,B.Vertex 10 399, B.Vertex 5 396) (B.Color 100 100 100) 200]
+    buildTriangles [B.Triangle (B.Vertex 1 0, B.Vertex 100 0, B.Vertex 100 100) (B.Color 255 255 255) 255]--ts
   flush
   postRedisplay Nothing
-
-
-type PixelArray = StorableArray Int Int
 
 
 preservingBufferBinding :: BufferTarget -> IO a -> IO a
@@ -154,7 +95,7 @@ preservingBufferBinding target action = do
 
 getpixels :: (Int,Int) -> IO BS.ByteString
 getpixels (w,h) = do
-  --pixelArray <- newArray (0, 9) 0 :: IO PixelArray
+
   let arraySize = (fromIntegral (w * h * 4))
   bs2 <- allocaBytes arraySize $ \ptr -> do
     --preservingBufferBinding PixelPackBuffer $ do
@@ -167,18 +108,12 @@ getpixels (w,h) = do
     bs <- BSI.create arraySize $ \d -> BSI.memcpy d ptr arraySize
 
 
-    a <- peekArray arraySize ptr
-    putStrLn $ "List: " ++ (show (take 800 a))
+--    a <- peekArray arraySize ptr
 
 --    fptr <- newForeignPtr_ ptr
 --    touchForeignPtr fptr
-    putStrLn "return"
---    let bs = fromForeignPtr fptr 0 arraySize
-    putStrLn $ "len fptr: " ++ (show (BS.length bs))
-    putStrLn $ (show (BS.take 100 bs))
+
+--    let bs = BSI.fromForeignPtr fptr 0 arraySize
     return bs
 
-  putStrLn "Returned"
-  putStrLn $ (show (BS.length bs2))
-  putStrLn $ (show (BS.take 100 bs2))
   return bs2
